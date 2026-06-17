@@ -1,0 +1,26 @@
+{
+  "id": "readreceipt",
+  "name": "Read Receipts",
+  "description": "WhatsApp-style read receipts for Mattermost direct and group messages.",
+  "homepage_url": "https://example.com/readreceipt",
+  "support_url": "https://example.com/readreceipt/support",
+  "release_notes_url": "https://example.com/readreceipt/releases",
+  "icon_path": "assets/icon.svg",
+  "version": "0.1.0",
+  "min_server_version": "10.0.0",
+  "server": {
+    "executables": {
+      "linux-amd64": "server/dist/plugin-linux-amd64"
+    }
+  },
+  "webapp": {
+    "bundle_path": "webapp/dist/main.js"
+  },
+  "settings_schema": {
+    "header": "Configure read receipts for direct and group messages.",
+    "settings": [
+      {"key":"EnableReadReceipts","display_name":"Enable Read Receipts","type":"bool","help_text":"When enabled, recipients can acknowledge delivered and read states for supported conversations.","default":false},
+      {"key":"EnableFor","display_name":"Enable For","type":"dropdown","help_text":"Choose which conversation types support read receipts.","default":"DM_AND_GM","options":[{"display_name":"DM","value":"DM"},{"display_name":"GM","value":"GM"},{"display_name":"DM and GM","value":"DM_AND_GM"}]}
+    ]
+  }
+}
