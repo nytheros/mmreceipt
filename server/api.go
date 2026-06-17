@@ -13,9 +13,17 @@ type receiptRequest struct {
 	PostID string `json:"post_id"`
 }
 
+type batchStatusRequest struct {
+	PostIDs []string `json:"post_ids"`
+}
+
 type statusResponse struct {
 	PostID   string          `json:"post_id"`
 	Receipts []ReceiptRecord `json:"receipts"`
+}
+
+type batchStatusResponse struct {
+	Statuses map[string][]ReceiptRecord `json:"statuses"`
 }
 
 func (p *Plugin) ServeHTTP(_ *plugin.Context, w http.ResponseWriter, r *http.Request) {
@@ -37,6 +45,8 @@ func (p *Plugin) ServeHTTP(_ *plugin.Context, w http.ResponseWriter, r *http.Req
 		p.handleReceipt(w, r, userID, StatusDelivered)
 	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/read":
 		p.handleReceipt(w, r, userID, StatusRead)
+	case r.Method == http.MethodPost && r.URL.Path == "/api/v1/status/batch":
+		p.handleBatchStatus(w, r, userID)
 	case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/status/"):
 		p.handleStatus(w, r, userID, strings.TrimPrefix(r.URL.Path, "/api/v1/status/"))
 	default:
@@ -108,6 +118,37 @@ func (p *Plugin) handleStatus(w http.ResponseWriter, r *http.Request, userID, po
 		return
 	}
 	writeJSON(w, statusResponse{PostID: postID, Receipts: receipts})
+}
+
+func (p *Plugin) handleBatchStatus(w http.ResponseWriter, r *http.Request, userID string) {
+	var req batchStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.PostIDs) == 0 {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if len(req.PostIDs) > 50 {
+		http.Error(w, "too many post ids (max 50)", http.StatusBadRequest)
+		return
+	}
+	// Validate all posts in a single pass: fetch each post, check sender and channel type
+	validIDs := make([]string, 0, len(req.PostIDs))
+	for _, postID := range req.PostIDs {
+		post, appErr := p.API.GetPost(postID)
+		if appErr != nil || post == nil || post.UserId != userID {
+			continue
+		}
+		channel, appErr := p.API.GetChannel(post.ChannelId)
+		if appErr != nil || channel == nil || !p.channelAllowed(channel.Type) {
+			continue
+		}
+		validIDs = append(validIDs, postID)
+	}
+	statuses, appErr := p.store.GetForPosts(validIDs)
+	if appErr != nil {
+		http.Error(w, appErr.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, batchStatusResponse{Statuses: statuses})
 }
 
 func (p *Plugin) channelAllowed(t model.ChannelType) bool {

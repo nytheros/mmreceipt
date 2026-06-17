@@ -85,7 +85,23 @@ func (s *ReceiptStore) addToIndex(postID, userID string) *model.AppError {
 }
 
 func (s *ReceiptStore) GetForPost(postID string) ([]ReceiptRecord, *model.AppError) {
-	b, appErr := s.api.KVGet(receiptIndexKey(postID))
+	return s.getReceipts(receiptIndexKey(postID), postID)
+}
+
+func (s *ReceiptStore) GetForPosts(postIDs []string) (map[string][]ReceiptRecord, *model.AppError) {
+	out := make(map[string][]ReceiptRecord, len(postIDs))
+	for _, postID := range postIDs {
+		recs, err := s.getReceipts(receiptIndexKey(postID), postID)
+		if err != nil {
+			return nil, err
+		}
+		out[postID] = recs
+	}
+	return out, nil
+}
+
+func (s *ReceiptStore) getReceipts(indexKey, postID string) ([]ReceiptRecord, *model.AppError) {
+	b, appErr := s.api.KVGet(indexKey)
 	if appErr != nil {
 		return nil, appErr
 	}

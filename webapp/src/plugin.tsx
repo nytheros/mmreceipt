@@ -10,6 +10,31 @@ let stopObserver: (() => void) | undefined;
 
 function postIdFromTime(el: Element): string | undefined { return el.closest('[id^="post_"]')?.id.replace(/^post_/, ''); }
 
+let pendingPosts = new Set<string>();
+let batchTimer: number | undefined;
+
+function flushBatch(): void {
+    batchTimer = undefined;
+    const ids = [...pendingPosts];
+    if (ids.length === 0) return;
+    pendingPosts = new Set<string>();
+    void fetch('/plugins/readreceipt/api/v1/status/batch', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({post_ids: ids}),
+    }).then((r) => r.ok ? r.json() : undefined).then((data) => {
+        if (!data?.statuses) return;
+        for (const [postId, receipts] of Object.entries(data.statuses)) {
+            if (receipts) receiptStore.set(postId, receipts as ReceiptRecord[]);
+        }
+    }).catch(() => undefined);
+}
+
+function queueBatchFetch(postId: string): void {
+    pendingPosts.add(postId);
+    if (!batchTimer) batchTimer = window.setTimeout(flushBatch, 100);
+}
+
 function enhanceTimestamps(): void {
     document.querySelectorAll('.post__time:not([data-rr-mounted="true"])').forEach((timeEl) => {
         const postId = postIdFromTime(timeEl);
@@ -23,7 +48,7 @@ function enhanceTimestamps(): void {
         const render = () => root.render(<ReceiptIndicator records={receiptStore.get(postId)} isGroup={false}/>);
         receiptStore.subscribe(render);
         render();
-        void fetch(`/plugins/readreceipt/api/v1/status/${postId}`, {credentials: 'same-origin'}).then((r) => r.ok ? r.json() : undefined).then((data) => { if (data?.receipts) receiptStore.set(postId, data.receipts); }).catch(() => undefined);
+        queueBatchFetch(postId);
     });
 }
 
