@@ -72,18 +72,17 @@ func (p *Plugin) handleReceipt(w http.ResponseWriter, r *http.Request, userID, s
 		http.Error(w, "not a channel member", http.StatusForbidden)
 		return
 	}
-	changed, appErr := p.store.Upsert(req.PostID, userID, status, model.GetMillis())
+	rec, appErr := p.store.Upsert(req.PostID, userID, status, model.GetMillis())
 	if appErr != nil {
 		http.Error(w, appErr.Error(), http.StatusInternalServerError)
 		return
 	}
-	rec := ReceiptRecord{PostID: req.PostID, UserID: userID, Status: status, UpdatedAt: model.GetMillis()}
-	if changed {
+	if rec.Status == status {
 		event := WSEventDelivered
 		if status == StatusRead {
 			event = WSEventRead
 		}
-		p.publishReceiptEvent(event, rec, post.UserId, post.ChannelId)
+		p.publishReceiptEvent(event, *rec, post.UserId, post.ChannelId)
 	}
 	writeJSON(w, rec)
 }

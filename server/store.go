@@ -37,30 +37,30 @@ func statusRank(status string) int {
 	return 0
 }
 
-func (s *ReceiptStore) Upsert(postID, userID, status string, now int64) (bool, *model.AppError) {
+func (s *ReceiptStore) Upsert(postID, userID, status string, now int64) (*ReceiptRecord, *model.AppError) {
 	key := receiptKey(postID, userID)
 	existingBytes, appErr := s.api.KVGet(key)
 	if appErr != nil {
-		return false, appErr
+		return nil, appErr
 	}
 	if existingBytes != nil {
 		var existing ReceiptRecord
 		if json.Unmarshal(existingBytes, &existing) == nil && statusRank(existing.Status) >= statusRank(status) {
-			return false, nil
+			return &existing, nil
 		}
 	}
 	rec := ReceiptRecord{PostID: postID, UserID: userID, Status: status, UpdatedAt: now}
 	data, err := json.Marshal(rec)
 	if err != nil {
-		return false, model.NewAppError("ReceiptStore.Upsert", "plugin.readreceipt.marshal", nil, err.Error(), 500)
+		return nil, model.NewAppError("ReceiptStore.Upsert", "plugin.readreceipt.marshal", nil, err.Error(), 500)
 	}
 	if appErr = s.api.KVSet(key, data); appErr != nil {
-		return false, appErr
+		return nil, appErr
 	}
 	if appErr = s.addToIndex(postID, userID); appErr != nil {
-		return false, appErr
+		return nil, appErr
 	}
-	return true, nil
+	return &rec, nil
 }
 
 func (s *ReceiptStore) addToIndex(postID, userID string) *model.AppError {
