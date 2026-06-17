@@ -3,6 +3,7 @@ package main
 import (
 	"sync"
 
+	"github.com/mattermost/mattermost/server/public/model"
 	"github.com/mattermost/mattermost/server/public/plugin"
 )
 
@@ -43,6 +44,34 @@ func (p *Plugin) OnConfigurationChange() error {
 	p.configuration = cfg
 	p.configurationLock.Unlock()
 	return nil
+}
+
+func (p *Plugin) MessageHasBeenPosted(c *plugin.Context, post *model.Post) {
+	cfg := p.getConfiguration()
+	if !cfg.EnableReadReceipts {
+		return
+	}
+	channel, appErr := p.API.GetChannel(post.ChannelId)
+	if appErr != nil || channel == nil || !p.channelAllowed(channel.Type) {
+		return
+	}
+	members, appErr := p.API.GetChannelMembers(post.ChannelId, 0, 100)
+	if appErr != nil {
+		return
+	}
+	now := model.GetMillis()
+	for _, member := range members {
+		if member.UserId == post.UserId {
+			continue
+		}
+		rec, err := p.store.Upsert(post.Id, member.UserId, StatusDelivered, now)
+		if err != nil {
+			continue
+		}
+		if rec != nil && rec.Status == StatusDelivered {
+			p.publishReceiptEvent(WSEventDelivered, *rec, post.UserId, post.ChannelId)
+		}
+	}
 }
 
 func main() { plugin.ClientMain(&Plugin{}) }
