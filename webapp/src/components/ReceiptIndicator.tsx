@@ -17,6 +17,5 @@ export function tooltip(records: ReceiptRecord[], isGroup: boolean): string {
 
 export function ReceiptIndicator({records, isGroup = false}: {records: ReceiptRecord[]; isGroup?: boolean}) {
     const status = aggregateStatus(records);
-    const color = status === 'read' ? '#2196F3' : status === 'delivered' ? 'gray' : 'inherit';
-    return <span className={`rr-indicator rr-${status}`} title={tooltip(records, isGroup)} style={{color, marginLeft: 4, fontWeight: 600}}>{status === 'sent' ? '✓' : '✓✓'}</span>;
+    return <span className={`rr-indicator rr-${status}`} title={tooltip(records, isGroup)} style={{marginLeft: 4, fontWeight: 600}}>{status === 'sent' ? '✓' : '✓✓'}</span>;
 }

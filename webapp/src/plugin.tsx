@@ -5,6 +5,14 @@ import {ReceiptIndicator} from './components/ReceiptIndicator';
 import {receiptStore, ReceiptRecord} from './store/receipt_store';
 import {startReadReceiptObserver} from './hooks/useReadReceiptObserver';
 
+function injectCSS(): void {
+    if (document.getElementById('rr-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'rr-styles';
+    style.textContent = `.rr-delivered { color: #808080 !important; } .rr-read { color: #2196F3 !important; } .rr-sent { color: inherit; }`;
+    document.head.appendChild(style);
+}
+
 const roots = new Map<Element, any>();
 let stopObserver: (() => void) | undefined;
 
@@ -68,6 +76,7 @@ function enhanceTimestamps(): void {
 
 class ReadReceiptPlugin {
     public async initialize(registry: PluginRegistry): Promise<void> {
+        injectCSS();
         registry.registerWebSocketEventHandler('custom_readreceipt_read_receipt_delivered', (msg: {data?: ReceiptRecord}) => { if (msg.data) receiptStore.upsert(msg.data); });
         registry.registerWebSocketEventHandler('custom_readreceipt_read_receipt_read', (msg: {data?: ReceiptRecord}) => { if (msg.data) receiptStore.upsert(msg.data); });
         stopObserver = startReadReceiptObserver();
