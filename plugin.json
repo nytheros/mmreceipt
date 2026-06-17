@@ -6,7 +6,7 @@
   "support_url": "https://example.com/readreceipt/support",
   "release_notes_url": "https://example.com/readreceipt/releases",
   "icon_path": "assets/icon.svg",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "min_server_version": "10.0.0",
   "server": {
     "executables": {

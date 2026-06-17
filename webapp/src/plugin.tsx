@@ -1,11 +1,11 @@
 import React from 'react';
-import {createRoot, Root} from 'react-dom/client';
+import ReactDOM from 'react-dom';
 type PluginRegistry = {registerWebSocketEventHandler(event: string, handler: (msg: {data?: ReceiptRecord}) => void): void};
 import {ReceiptIndicator} from './components/ReceiptIndicator';
 import {receiptStore, ReceiptRecord} from './store/receipt_store';
 import {startReadReceiptObserver} from './hooks/useReadReceiptObserver';
 
-const roots = new Map<Element, Root>();
+const roots = new Map<Element, any>();
 let stopObserver: (() => void) | undefined;
 
 function postIdFromTime(el: Element): string | undefined { return el.closest('[id^="post_"]')?.id.replace(/^post_/, ''); }
@@ -35,6 +35,24 @@ function queueBatchFetch(postId: string): void {
     if (!batchTimer) batchTimer = window.setTimeout(flushBatch, 100);
 }
 
+function mountReceiptIndicator(mount: Element, postId: string): void {
+    const render = () => {
+        const vnode = React.createElement(ReceiptIndicator, {records: receiptStore.get(postId), isGroup: false});
+        if ((ReactDOM as any).createRoot) {
+            let root = roots.get(mount);
+            if (!root) {
+                root = (ReactDOM as any).createRoot(mount);
+                roots.set(mount, root);
+            }
+            root.render(vnode);
+        } else {
+            ReactDOM.render(vnode, mount);
+        }
+    };
+    receiptStore.subscribe(render);
+    render();
+}
+
 function enhanceTimestamps(): void {
     document.querySelectorAll('.post__time:not([data-rr-mounted="true"])').forEach((timeEl) => {
         const postId = postIdFromTime(timeEl);
@@ -43,11 +61,7 @@ function enhanceTimestamps(): void {
         const mount = document.createElement('span');
         mount.className = 'rr-mount';
         timeEl.insertAdjacentElement('afterend', mount);
-        const root = createRoot(mount);
-        roots.set(mount, root);
-        const render = () => root.render(<ReceiptIndicator records={receiptStore.get(postId)} isGroup={false}/>);
-        receiptStore.subscribe(render);
-        render();
+        mountReceiptIndicator(mount, postId);
         queueBatchFetch(postId);
     });
 }
@@ -62,7 +76,15 @@ class ReadReceiptPlugin {
         mutation.observe(document.body, {childList: true, subtree: true});
     }
 
-    public uninitialize(): void { stopObserver?.(); roots.forEach((root) => root.unmount()); roots.clear(); }
+    public uninitialize(): void {
+        stopObserver?.();
+        if ((ReactDOM as any).createRoot) {
+            roots.forEach((root) => root.unmount());
+        } else {
+            document.querySelectorAll('.rr-mount').forEach((el) => ReactDOM.unmountComponentAtNode(el));
+        }
+        roots.clear();
+    }
 }
 
 declare global { interface Window { registerPlugin(id: string, plugin: ReadReceiptPlugin): void; } }
