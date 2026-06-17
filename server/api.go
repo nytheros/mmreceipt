@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mattermost/mattermost/server/public/model"
+	"github.com/mattermost/mattermost/server/public/plugin"
 )
 
 type receiptRequest struct {
@@ -17,7 +18,7 @@ type statusResponse struct {
 	Receipts []ReceiptRecord `json:"receipts"`
 }
 
-func (p *Plugin) ServeHTTP(_ *http.Request, w http.ResponseWriter, r *http.Request) {
+func (p *Plugin) ServeHTTP(_ *plugin.Context, w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(r.URL.Path, "/api/v1/") {
 		http.NotFound(w, r)
 		return
